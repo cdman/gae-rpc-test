@@ -1,7 +1,6 @@
 import time
 
-from google.appengine.api import apiproxy_stub_map
-from google.appengine.api import urlfetch
+from google.appengine.ext import ndb
 
 import webapp2
 
@@ -25,19 +24,19 @@ class MainHandler(webapp2.RequestHandler):
 
     def get(self):
         start = time.time()
-        sleep1, sleep2 = float(self.request.get('sleep1')), float(self.request.get('sleep2'))
+        sleep1 = float(self.request.get('sleep1'))
         self.response.headers['Content-Type'] = 'text/plain'
-        rpc1, rpc2 = self.__fetch(sleep1), self.__fetch(sleep2)
-        result = apiproxy_stub_map.UserRPC.wait_any([rpc1, rpc2])
+        context = ndb.get_context()
+        rpc1 = context.urlfetch('%s/sleep?delay=%f' % (self.request.host_url, sleep1), deadline=sleep1*2)
+        end = start + sleep1
+        while time.time() < end:
+            rpc2 = context.memcache_get('foo')
+            ndb.Future.wait_any([rpc1, rpc2])
+            if rpc1.done():
+                break
+            time.sleep(0.01)
         finished_in = time.time() - start
-        if result is rpc1:
-            self.response.write('Finished 1\n')
-        elif result is rpc2:
-            self.response.write('Finished 2\n')
-        else:
-            self.response.write('Finished unknown!\n')
         self.response.write('rpc1 status is: %s\n' % rpc1.state)
-        self.response.write('rpc2 status is: %s\n' % rpc2.state)
         self.response.write('Finished in %fs\n' % finished_in)
 
 
