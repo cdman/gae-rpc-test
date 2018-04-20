@@ -1,6 +1,7 @@
 import time
 
 from google.appengine.ext import ndb
+from google.appengine.ext.ndb import eventloop
 
 import webapp2
 
@@ -29,9 +30,9 @@ class MainHandler(webapp2.RequestHandler):
         context = ndb.get_context()
         rpc1 = context.urlfetch('%s/sleep?delay=%f' % (self.request.host_url, sleep1), deadline=sleep1*2)
         end = start + sleep1
+        ev = eventloop.get_event_loop()
         while time.time() < end:
-            rpc2 = context.memcache_get('foo')
-            ndb.Future.wait_any([rpc1, rpc2])
+            ev.run1()
             if rpc1.done():
                 break
             time.sleep(0.01)
